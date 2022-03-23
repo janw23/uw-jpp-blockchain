@@ -1,18 +1,21 @@
 -- jw418479
 module HashTree where
 import Hashable32
+import Data.Maybe
+import Utils (fromEither)
+import Data.IntMap (mapEither)
 
 -- TODO add Twig (node with one child)
 data Tree a = Leaf a | Twig Hash (Tree a) | Node Hash (Tree a) (Tree a)
 
--- TODO provided specification does not have "Hashable a". Is this a mistake?
-treeHash :: Hashable a => Tree a -> Hash
-treeHash (Leaf x) = hash x
+treeHash :: Tree a -> Hash
+treeHash (Leaf x) = undefined -- trees composed of one leaf do not occur in nature
 treeHash (Twig h x) = h
 treeHash (Node h l r) = h
 
 instance Hashable a => Hashable (Tree a) where
-    hash = treeHash
+    hash (Leaf x) = hash x
+    hash t = treeHash t
 
 leaf :: Hashable a => a -> Tree a
 leaf = Leaf
@@ -26,6 +29,7 @@ node l r = Node (hash (l, r)) l r
 buildTree :: Hashable a => [a] -> Tree a
 buildTree [] = undefined
 buildTree lst = reduce $ map leaf lst where
+    reduce [Leaf x] = let [t] = enpair [Leaf x] in t -- make sure one-leaf trees do not occur in nature
     reduce [t] = t
     reduce ts = reduce $ enpair ts
     enpair (l:r:t) = node l r : enpair t
@@ -42,3 +46,37 @@ drawTree = draw "" where
     shwHead p h s = showString p . showString (showHash h) . showString (' ':s)
     shwSubTree pref t = showString $ draw ("  "++pref) t
     endl = showString "\n"
+
+
+type MerklePath = [Either Hash Hash]
+data MerkleProof a = MerkleProof a MerklePath deriving (Show)
+
+-- TODO hide this or make functor?
+extend :: Maybe (MerkleProof a) -> Either Hash Hash -> Maybe (MerkleProof a)
+extend (Just (MerkleProof e path)) h = Just (MerkleProof e $ h:path)
+extend _ _ = Nothing
+
+-- TODO hide?
+gatherLeaves :: Hashable a => (MerklePath -> a -> sol) -> (sol -> sol -> sol) -> Tree a -> sol
+gatherLeaves make combine = visit [] where
+    visit path (Leaf x) = make path x
+    visit path (Twig h t) = visit (Left (hash t):path) t
+    visit path (Node h l r) = visit (Left (hash r):path) l `combine` visit (Right (hash l):path) r
+
+merklePaths :: Hashable a => a -> Tree a -> [MerklePath]
+merklePaths e = gatherLeaves make (++) where
+    make path x = [reverse path | hash e == hash x]
+
+buildProof :: Hashable a => a -> Tree a -> Maybe (MerkleProof a)
+buildProof e = gatherLeaves make combine where
+    make path x = if hash e == hash x then Just (MerkleProof e $ reverse path) else Nothing
+    combine l r = if isJust l then l else r
+
+verifyProof :: Hashable a => Hash -> MerkleProof a -> Bool
+verifyProof h (MerkleProof e path) = h == foldr hashEither (hash e) path where
+    hashEither (Right h) acc = hash (h, acc)
+    hashEither (Left h) acc = hash (acc, h)
+
+p, q :: Either Hash Hash
+p = Left (hash 'i')
+q = Right (hash 'j')
