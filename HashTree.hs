@@ -3,9 +3,8 @@ module HashTree where
 import Hashable32
 import Data.Maybe
 import Utils (fromEither)
-import Data.IntMap (mapEither)
+import Data.Either
 
--- TODO add Twig (node with one child)
 data Tree a = Leaf a | Twig Hash (Tree a) | Node Hash (Tree a) (Tree a)
 
 treeHash :: Tree a -> Hash
@@ -49,12 +48,17 @@ drawTree = draw "" where
 
 
 type MerklePath = [Either Hash Hash]
-data MerkleProof a = MerkleProof a MerklePath deriving (Show)
+data MerkleProof a = MerkleProof a MerklePath
 
--- TODO hide this or make functor?
-extend :: Maybe (MerkleProof a) -> Either Hash Hash -> Maybe (MerkleProof a)
-extend (Just (MerkleProof e path)) h = Just (MerkleProof e $ h:path)
-extend _ _ = Nothing
+showMerklePath :: MerklePath -> String
+showMerklePath [] = ""
+showMerklePath (h:t) = showArrow . showString (showHash $ fromEither h) $ showMerklePath t where
+    showArrow = showString (if isLeft h then "<" else ">")
+
+instance Show a => Show (MerkleProof a) where
+    showsPrec p (MerkleProof e path) = 
+        showParen (p>0) (showString "MerkleProof " . shows e .
+            showString " " . showString (showMerklePath path))
 
 -- TODO hide?
 gatherLeaves :: Hashable a => (MerklePath -> a -> sol) -> (sol -> sol -> sol) -> Tree a -> sol
@@ -63,6 +67,7 @@ gatherLeaves make combine = visit [] where
     visit path (Twig h t) = visit (Left (hash t):path) t
     visit path (Node h l r) = visit (Left (hash r):path) l `combine` visit (Right (hash l):path) r
 
+-- TODO using (++) as combine may end up inefficient. Use difference lists?
 merklePaths :: Hashable a => a -> Tree a -> [MerklePath]
 merklePaths e = gatherLeaves make (++) where
     make path x = [reverse path | hash e == hash x]
@@ -76,7 +81,3 @@ verifyProof :: Hashable a => Hash -> MerkleProof a -> Bool
 verifyProof h (MerkleProof e path) = h == foldr hashEither (hash e) path where
     hashEither (Right h) acc = hash (h, acc)
     hashEither (Left h) acc = hash (acc, h)
-
-p, q :: Either Hash Hash
-p = Left (hash 'i')
-q = Right (hash 'j')
