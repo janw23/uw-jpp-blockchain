@@ -5,7 +5,8 @@ import Data.Word
 import Hashable32
 import HashTree
 -- import PPrint
-import Utils
+-- import Utils
+import Data.Maybe
 
 type Address = Hash
 type Amount = Word32
@@ -56,8 +57,8 @@ type Miner = Address
 type Nonce = Word32
 
 mineBlock :: Miner -> Hash -> [Transaction] -> Block
-mineBlock miner parent txs = Block {blockHdr = hdr, blockTxs = txs} where
-  makeCandidate nonce = BlockHeader {parent = parent, coinbase = _coinbase, txroot = _txroot, nonce = nonce}
+mineBlock miner parent txs = Block hdr txs where
+  makeCandidate nonce = BlockHeader parent _coinbase _txroot nonce
   hdr = head $ filter validNonce $ map makeCandidate [0..] -- take first block header with valid nonce
   _coinbase = coinbaseTx miner
   _txroot = hash $ buildTree (_coinbase : txs)
@@ -127,7 +128,11 @@ validateReceipt r hdr = txrBlock r == hash hdr
                         && verifyProof (txroot hdr) (txrProof r)
 
 mineTransactions :: Miner -> Hash -> [Transaction] -> (Block, [TransactionReceipt])
-mineTransactions miner parent txs = undefined
+mineTransactions miner parent txs = (block, receipts) where
+  block = mineBlock miner parent txs
+  tree = buildTree $ coinbase (blockHdr block) : txs
+  proofs = map (fromJust . flip buildProof tree) txs
+  receipts = map (TxReceipt $ hash block) proofs
 
 {- | Pretty printing
 >>> runShows $ pprBlock block2
