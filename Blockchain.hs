@@ -4,7 +4,7 @@ import Data.Word
 
 import Hashable32
 import HashTree
--- import PPrint
+import PPrint
 -- import Utils
 import Data.Maybe
 
@@ -199,38 +199,36 @@ Tx# 0xbcc3e45a from: 0000000000 to: 0x5303a90e amount: 50000
 Tx# 0x085e2467 from: 0x790251e0 to: 0xb1011705 amount: 1000
 -}
 
--- TODO implement code below (requires PPrint)
+pprHeader :: BlockHeader -> ShowS
+pprHeader self@(BlockHeader parent cb txroot nonce)
+  = pprV [ p ("hash", VH $ hash self)
+         , p ("parent", VH $ parent)
+         , p ("miner", VH $ txTo cb)
+         , p ("root", VH txroot)
+         , p ("nonce", nonce)
+         ]
+  where
+    nl = showString "\n"
+    p :: Show a => (String, a) -> ShowS
+    p = showsPair
 
--- pprHeader :: BlockHeader -> ShowS
--- pprHeader self@(BlockHeader parent cb txroot nonce)
---   = pprV [ p ("hash", VH $ hash self)
---          , p ("parent", VH $ parent)
---          , p ("miner", VH $ txTo cb)
---          , p ("root", VH txroot)
---          , p ("nonce", nonce)
---          ]
---   where
---     nl = showString "\n"
---     p :: Show a => (String, a) -> ShowS
---     p = showsPair
+pprBlock :: Block -> ShowS
+pprBlock (Block header txs)
+ = pprHeader header
+ . showChar '\n'
+ . pprTxs (coinbase header:txs)
 
--- pprBlock :: Block -> ShowS
--- pprBlock (Block header txs)
---  = pprHeader header
---  . showChar '\n'
---  . pprTxs (coinbase header:txs)
+pprTx :: Transaction -> ShowS
+pprTx tx@(Tx from to amount)
+  = pprH [ showString "Tx#"
+         , showsHash (hash tx)
+         , p ("from", VH from)
+         , p ("to", VH to)
+         , p ("amount", amount)
+         ]
+  where
+    p :: Show a => (String, a) -> ShowS
+    p = showsPair
 
--- pprTx :: Transaction -> ShowS
--- pprTx tx@(Tx from to amount)
---   = pprH [ showString "Tx#"
---          , showsHash (hash tx)
---          , p ("from", VH from)
---          , p ("to", VH to)
---          , p ("amount", amount)
---          ]
---   where
---     p :: Show a => (String, a) -> ShowS
---     p = showsPair
-
--- pprTxs :: [Transaction] -> ShowS
--- pprTxs = pprV . map pprTx
+pprTxs :: [Transaction] -> ShowS
+pprTxs = pprV . map pprTx
