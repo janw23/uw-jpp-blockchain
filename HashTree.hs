@@ -5,19 +5,18 @@ import Data.Maybe
 import Utils (fromEither)
 import Data.Either
 
-data Tree a = Leaf a | Twig Hash (Tree a) | Node Hash (Tree a) (Tree a)
+data Tree a = Leaf Hash a | Twig Hash (Tree a) | Node Hash (Tree a) (Tree a)
 
 treeHash :: Tree a -> Hash
-treeHash (Leaf x) = undefined -- trees composed of one leaf do not occur in nature
+treeHash (Leaf h x) = h
 treeHash (Twig h x) = h
 treeHash (Node h l r) = h
 
 instance Hashable a => Hashable (Tree a) where
-    hash (Leaf x) = hash x
-    hash t = treeHash t
+    hash = treeHash
 
 leaf :: Hashable a => a -> Tree a
-leaf = Leaf
+leaf x = Leaf (hash x) x
 
 twig :: Hashable a => Tree a -> Tree a
 twig t = Twig (hash (t, t)) t
@@ -28,7 +27,7 @@ node l r = Node (hash (l, r)) l r
 buildTree :: Hashable a => [a] -> Tree a
 buildTree [] = undefined
 buildTree lst = reduce $ map leaf lst where
-    reduce [Leaf x] = let [t] = enpair [Leaf x] in t -- make sure one-leaf trees do not occur in nature
+    -- reduce [Leaf h x] = let [t] = enpair [Leaf h x] in t -- make sure one-leaf trees do not occur in nature
     reduce [t] = t
     reduce ts = reduce $ enpair ts
     enpair (l:r:t) = node l r : enpair t
@@ -36,10 +35,9 @@ buildTree lst = reduce $ map leaf lst where
     enpair [] = []
 
 -- TODO make an abstraction of prefixing with tabs?
--- TODO provided specification does not have "Hashable a". Is this a mistake?
-drawTree :: (Hashable a, Show a) => Tree a -> String
+drawTree :: Show a => Tree a -> String
 drawTree = draw "" where
-    draw pref (Leaf x) = shwHead pref (hash x) (show x) ""
+    draw pref (Leaf h x) = shwHead pref h (show x) ""
     draw pref (Node h l r) = shwHead pref h "-" . endl . shwSubTree pref l . endl . shwSubTree pref r $ ""
     draw pref (Twig h t) = shwHead pref h "+" . endl . shwSubTree pref t $ ""
     shwHead p h s = showString p . showString (showHash h) . showString (' ':s)
@@ -63,7 +61,7 @@ instance Show a => Show (MerkleProof a) where
 -- TODO hide?
 gatherLeaves :: Hashable a => (MerklePath -> a -> sol) -> (sol -> sol -> sol) -> Tree a -> sol
 gatherLeaves make combine = visit [] where
-    visit path (Leaf x) = make path x
+    visit path (Leaf h x) = make path x
     visit path (Twig h t) = visit (Left (hash t):path) t
     visit path (Node h l r) = visit (Left (hash r):path) l `combine` visit (Right (hash l):path) r
 
