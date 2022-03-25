@@ -55,7 +55,7 @@ showMerklePath (h:t) = showArrow . showString (showHash $ fromEither h) $ showMe
 
 instance Show a => Show (MerkleProof a) where
     showsPrec p (MerkleProof e path) = 
-        showParen (p>0) (showString "MerkleProof " . shows e .
+        showParen (p>0) (showString "MerkleProof " . showsPrec 11 e .
             showString " " . showString (showMerklePath path))
 
 -- TODO hide?
