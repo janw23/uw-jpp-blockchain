@@ -52,7 +52,7 @@ showMerklePath (x:xs) = showArrow . showString (showHash $ fromEither x) $ showM
     showArrow = showString (if isLeft x then "<" else ">")
 
 instance Show a => Show (MerkleProof a) where
-    showsPrec p (MerkleProof e path) = 
+    showsPrec p (MerkleProof e path) =
         showParen (p>0) (showString "MerkleProof " . showsPrec 11 e .
             showString " " . showString (showMerklePath path))
 
@@ -63,10 +63,10 @@ gatherLeaves make combine = visit [] where
     visit path (Twig h t) = visit (Left (hash t):path) t
     visit path (Node h l r) = visit (Left (hash r):path) l `combine` visit (Right (hash l):path) r
 
--- TODO using (++) as combine may end up inefficient. Use difference lists?
+-- This function uses difference lists for efficient concatenation.
 merklePaths :: Hashable a => a -> Tree a -> [MerklePath]
-merklePaths e = gatherLeaves make (++) where
-    make path h = [reverse path | hash e == h]
+merklePaths e t = gatherLeaves make (.) t [] where
+    make path h = if hash e == h then (reverse path :) else id
 
 buildProof :: Hashable a => a -> Tree a -> Maybe (MerkleProof a)
 buildProof e = gatherLeaves make combine where
