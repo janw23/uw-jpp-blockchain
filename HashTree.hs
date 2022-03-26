@@ -12,7 +12,7 @@ treeHash (Leaf h x) = h
 treeHash (Twig h x) = h
 treeHash (Node h l r) = h
 
-instance Hashable a => Hashable (Tree a) where
+instance Hashable (Tree a) where
     hash = treeHash
 
 leaf :: Hashable a => a -> Tree a
@@ -27,14 +27,12 @@ node l r = Node (hash (l, r)) l r
 buildTree :: Hashable a => [a] -> Tree a
 buildTree [] = undefined
 buildTree lst = reduce $ map leaf lst where
-    -- reduce [Leaf h x] = let [t] = enpair [Leaf h x] in t -- make sure one-leaf trees do not occur in nature
     reduce [t] = t
     reduce ts = reduce $ enpair ts
-    enpair (l:r:t) = node l r : enpair t
+    enpair (l:r:ts) = node l r : enpair ts
     enpair [t] = [twig t]
     enpair [] = []
 
--- TODO make an abstraction of prefixing with tabs?
 drawTree :: Show a => Tree a -> String
 drawTree = draw "" where
     draw pref (Leaf h x) = shwHead pref h (show x) ""
@@ -50,29 +48,29 @@ data MerkleProof a = MerkleProof a MerklePath
 
 showMerklePath :: MerklePath -> String
 showMerklePath [] = ""
-showMerklePath (h:t) = showArrow . showString (showHash $ fromEither h) $ showMerklePath t where
-    showArrow = showString (if isLeft h then "<" else ">")
+showMerklePath (x:xs) = showArrow . showString (showHash $ fromEither x) $ showMerklePath xs where
+    showArrow = showString (if isLeft x then "<" else ">")
 
 instance Show a => Show (MerkleProof a) where
     showsPrec p (MerkleProof e path) = 
         showParen (p>0) (showString "MerkleProof " . showsPrec 11 e .
             showString " " . showString (showMerklePath path))
 
--- TODO hide?
-gatherLeaves :: Hashable a => (MerklePath -> a -> sol) -> (sol -> sol -> sol) -> Tree a -> sol
+-- Traverse the tree and combine partial solutions made when visiting each leaf.
+gatherLeaves :: (MerklePath -> Hash -> sol) -> (sol -> sol -> sol) -> Tree a -> sol
 gatherLeaves make combine = visit [] where
-    visit path (Leaf h x) = make path x
+    visit path (Leaf h x) = make path h
     visit path (Twig h t) = visit (Left (hash t):path) t
     visit path (Node h l r) = visit (Left (hash r):path) l `combine` visit (Right (hash l):path) r
 
 -- TODO using (++) as combine may end up inefficient. Use difference lists?
 merklePaths :: Hashable a => a -> Tree a -> [MerklePath]
 merklePaths e = gatherLeaves make (++) where
-    make path x = [reverse path | hash e == hash x]
+    make path h = [reverse path | hash e == h]
 
 buildProof :: Hashable a => a -> Tree a -> Maybe (MerkleProof a)
 buildProof e = gatherLeaves make combine where
-    make path x = if hash e == hash x then Just (MerkleProof e $ reverse path) else Nothing
+    make path h = if hash e == h then Just (MerkleProof e $ reverse path) else Nothing
     combine l r = if isJust l then l else r
 
 verifyProof :: Hashable a => Hash -> MerkleProof a -> Bool

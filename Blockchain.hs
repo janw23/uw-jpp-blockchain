@@ -6,7 +6,6 @@ import Data.Word
 import Hashable32
 import HashTree
 import PPrint
--- import Utils
 import Data.Maybe
 
 type Address = Hash
@@ -60,7 +59,7 @@ type Nonce = Word32
 mineBlock :: Miner -> Hash -> [Transaction] -> Block
 mineBlock miner parent txs = Block hdr txs where
   makeCandidate nonce = BlockHeader parent _coinbase _txroot nonce
-  hdr = head $ filter validNonce $ map makeCandidate [0..] -- take first block header with valid nonce
+  hdr = head $ filter validNonce $ map makeCandidate [0..] -- take the first block header with valid nonce
   _coinbase = coinbaseTx miner
   _txroot = hash $ buildTree (_coinbase : txs)
 
